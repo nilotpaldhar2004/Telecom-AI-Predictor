@@ -1,19 +1,18 @@
 import os
 import logging
 import time
-import pickle
-import joblib  # Added for better scikit-learn compatibility
+import joblib
 from contextlib import asynccontextmanager
 
 import pandas as pd
 import numpy as np
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 import uvicorn
 
-# ── Logging ───────────────────────────────────────────────────────────────────
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -21,8 +20,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger("churn-api")
 
-# ── Config ────────────────────────────────────────────────────────────────────
-# Ensure this matches your renamed file
+
 MODEL_FILE = os.getenv("MODEL_FILE", "model.pkl")
 PORT = int(os.getenv("PORT", 7860))
 
@@ -53,29 +51,28 @@ class ChurnRequest(BaseModel):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Use absolute path to avoid "File Not Found" in Docker
+
     base_path = os.path.dirname(os.path.abspath(__file__))
     full_path = os.path.join(base_path, MODEL_FILE)
 
-    logger.info("Loading model from '%s' ...", full_path)
+    logger.info("Loading model from: %s", full_path)
     try:
-        # joblib is generally preferred for scikit-learn models
+
         ml["model"] = joblib.load(full_path)
         logger.info("Model loaded successfully.")
     except Exception as e:
-        logger.error("Failed to load model: %s", e)
+        logger.error("Failed to load model: %s. Verify model.pkl is in the root.", e)
         ml["model"] = None
     yield
     ml.clear()
     logger.info("Server shutting down.")
 
-
 app = FastAPI(
     title="Telecom Churn Prediction API",
-    version="2.0.0",
+    version="2.0.1",
     lifespan=lifespan,
     docs_url="/docs",
-    root_path="/",  # Important for Hugging Face Proxy
+    root_path="/",
 )
 
 app.add_middleware(
@@ -86,9 +83,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-# ... [Timing middleware and GET routes remain the same] ...
-
 @app.middleware("http")
 async def timing_middleware(request, call_next):
     start = time.perf_counter()
@@ -97,12 +91,17 @@ async def timing_middleware(request, call_next):
     response.headers["X-Process-Time-Ms"] = f"{elapsed:.2f}"
     return response
 
-
-@app.get("/", include_in_schema=False)
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def serve_frontend():
-    if os.path.exists("index.html"):
-        return FileResponse("index.html")
-    return {"message": "Churn API v2.0.0 is live. POST to /predict."}
+    """Serves the index.html file as a webpage on the root URL."""
+    index_path = os.path.join(os.path.dirname(__file__), "index.html")
+    try:
+        if os.path.exists(index_path):
+            with open(index_path, "r", encoding="utf-8") as f:
+                return f.read()
+        return "<h1>RevenueShield API: Live</h1><p>index.html not found in root directory.</p>"
+    except Exception as e:
+        return f"<h1>Error loading UI</h1><p>{str(e)}</p>"
 
 
 @app.get("/health", tags=["System"])
@@ -118,20 +117,19 @@ async def health():
 async def predict(req: ChurnRequest):
     model = ml.get("model")
     if model is None:
-        raise HTTPException(status_code=503, detail="Model not loaded. Check logs.")
+        raise HTTPException(status_code=503, detail="Model not loaded. Check server logs.")
 
     try:
         t0 = time.perf_counter()
         data = req.model_dump()
         input_df = pd.DataFrame([data])
 
-        # Inference
+
         raw_pred = model.predict(input_df)[0]
         probabilities = model.predict_proba(input_df)[0]
 
         churn_prob = round(float(probabilities[1]) * 100, 2)
 
-        # Robust handling of different label types (string vs int)
         if isinstance(raw_pred, (str, np.str_)):
             is_churn = raw_pred.lower() in ["yes", "1", "churn"]
         else:
@@ -151,7 +149,6 @@ async def predict(req: ChurnRequest):
     except Exception as exc:
         logger.exception("Prediction failed")
         raise HTTPException(status_code=400, detail=str(exc))
-
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
