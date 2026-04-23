@@ -5,11 +5,12 @@ pydantic==2.9.0
 python-multipart==0.0.12
 
 # ── ML / Data ─────────────────────────────────────────────────
-# Make sure this version matches your local training environment!
+# Upgrading NumPy to 2.x to fix the _core error
+numpy>=2.0.0
+pandas>=2.2.3
 scikit-learn==1.6.1
-pandas==2.2.0
-numpy==1.26.0
 joblib==1.4.2
 
-# ── HTTP (If you fetch any external data) ────────────────────
-requests==2.32.3
+# ── Performance (Optional but recommended) ───────────────────
+# This removes the "Pyarrow" warning you saw in the logs
+pyarrow>=15.0.0
