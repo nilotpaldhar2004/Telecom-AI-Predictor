@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from pydantic import BaseModel, Field
 import uvicorn
 
-# ── Logging Configuration ─────────────────────────────────────────────────────
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
@@ -20,13 +20,13 @@ logging.basicConfig(
 )
 logger = logging.getLogger("churn-api")
 
-# ── Configuration ─────────────────────────────────────────────────────────────
+
 MODEL_FILE = os.getenv("MODEL_FILE", "model.pkl")
 PORT = int(os.getenv("PORT", 7860))
 
 ml = {}
 
-# ── Data Schema ───────────────────────────────────────────────────────────────
+
 class ChurnRequest(BaseModel):
     gender:           str
     SeniorCitizen:    int   = Field(..., ge=0, le=1)
@@ -48,16 +48,16 @@ class ChurnRequest(BaseModel):
     MonthlyCharges:   float = Field(..., ge=0)
     TotalCharges:     float = Field(..., ge=0)
 
-# ── Lifespan Management ───────────────────────────────────────────────────────
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Absolute pathing for Docker/Hugging Face
+
     base_path = os.path.dirname(os.path.abspath(__file__))
     full_path = os.path.join(base_path, MODEL_FILE)
 
     logger.info("Loading model from: %s", full_path)
     try:
-        # Using joblib for better compatibility with scikit-learn
+
         ml["model"] = joblib.load(full_path)
         logger.info("Model loaded successfully.")
     except Exception as e:
@@ -67,7 +67,7 @@ async def lifespan(app: FastAPI):
     ml.clear()
     logger.info("Server shutting down.")
 
-# ── FastAPI Instance ──────────────────────────────────────────────────────────
+
 app = FastAPI(
     title="Telecom Churn Prediction API",
     version="2.0.1",
@@ -76,7 +76,6 @@ app = FastAPI(
     root_path="/", # Crucial for Hugging Face Proxy
 )
 
-# ── Middleware ────────────────────────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -93,7 +92,6 @@ async def timing_middleware(request, call_next):
     response.headers["X-Process-Time-Ms"] = f"{elapsed:.2f}"
     return response
 
-# ── Routes ────────────────────────────────────────────────────────────────────
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def serve_frontend():
@@ -135,13 +133,12 @@ async def predict(req: ChurnRequest):
         data = req.model_dump()
         input_df = pd.DataFrame([data])
 
-        # Prediction
+
         raw_pred = model.predict(input_df)[0]
         probabilities = model.predict_proba(input_df)[0]
 
         churn_prob = round(float(probabilities[1]) * 100, 2)
 
-        # Handle different prediction label types
         if isinstance(raw_pred, (str, np.str_)):
             is_churn = raw_pred.lower() in ["yes", "1", "churn"]
         else:
@@ -162,6 +159,5 @@ async def predict(req: ChurnRequest):
         logger.exception("Prediction failed")
         raise HTTPException(status_code=400, detail=str(exc))
 
-# ── Execution ─────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=PORT)
