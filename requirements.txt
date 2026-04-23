@@ -1,0 +1,15 @@
+# ── Web Framework ─────────────────────────────────────────────
+fastapi==0.115.0
+uvicorn==0.32.0
+pydantic==2.9.0
+python-multipart==0.0.12
+
+# ── ML / Data ─────────────────────────────────────────────────
+# Make sure this version matches your local training environment!
+scikit-learn==1.6.1
+pandas==2.2.0
+numpy==1.26.0
+joblib==1.4.2
+
+# ── HTTP (If you fetch any external data) ────────────────────
+requests==2.32.3

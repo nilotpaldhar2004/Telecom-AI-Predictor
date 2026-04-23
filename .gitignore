@@ -1,0 +1,27 @@
+# --- Python & Environment ---
+venv/
+env/
+ENV/
+.env
+__pycache__/
+*.py[cod]
+*$py.class
+
+# --- IDE & Workspace ---
+.idea/
+.vscode/
+*.iml
+*.iws
+*.swp
+
+# --- Large Binary Files (DO NOT PUSH TO GITHUB/HF) ---
+# We manually upload these to the Hugging Face Files tab
+*.pkl
+*.joblib
+*.zip
+*.h5
+
+
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
