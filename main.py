@@ -92,16 +92,32 @@ async def timing_middleware(request, call_next):
     return response
 
 @app.get("/", response_class=HTMLResponse, include_in_schema=False)
+
+
+from fastapi.responses import HTMLResponse
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
 async def serve_frontend():
     """Serves the index.html file as a webpage on the root URL."""
     index_path = os.path.join(os.path.dirname(__file__), "index.html")
     try:
         if os.path.exists(index_path):
             with open(index_path, "r", encoding="utf-8") as f:
-                return f.read()
-        return "<h1>RevenueShield API: Live</h1><p>index.html not found in root directory.</p>"
+                content = f.read()
+            # Explicitly returning HTMLResponse with status 200
+            return HTMLResponse(content=content, status_code=200)
+
+        return HTMLResponse(
+            content="<h1>RevenueShield API: Live</h1><p>index.html not found.</p>",
+            status_code=404
+        )
     except Exception as e:
-        return f"<h1>Error loading UI</h1><p>{str(e)}</p>"
+        logger.error(f"UI Loading Error: {e}")
+        return HTMLResponse(
+            content=f"<h1>Error loading UI</h1><p>{str(e)}</p>",
+            status_code=500
+        )
 
 
 @app.get("/health", tags=["System"])
